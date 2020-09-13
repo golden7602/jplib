@@ -20,7 +20,7 @@ class xls_alignment():
     HORZ_RIGHT = 0x03  #右端对齐
 
 
-class JPExportToExcel(object):
+class ExportToExcel(object):
     rowExported = QtCore.pyqtSignal(int, int)
 
     def __init__(self, parent):

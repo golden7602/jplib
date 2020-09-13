@@ -6,17 +6,18 @@ from functools import partial
 from PyQt5 import QtCore, QtSql, QtWidgets
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor
-from JPPrint.JPPrintReportNew import JPReport
-from JPDatabase.FieldType import JPFieldType, getJPFieldType
+from ..print.printReport import Report
+from ..database.FieldType import FieldType, getFieldType
 
 from ._delegate import (DateDelegate, FloatDelegate, IntgerDelegate,
                         IntSearchDelegate, IntSelectDelegate, StringDelegate)
 from ._icos import _ICO_DICT, _loadIcon
 from ._viewColumn import ViewColumn, ViewColumns
-from .constants import (JPEditDataMode, JPEditFormModelRole, JPStatisticsMode,
-                        SaveDataSqlType,JPButtonEnum)
-from ._exportToExcel import JPExportToExcel
+from .constants import (EditDataMode, EditFormModelRole, StatisticsMode,
+                        SaveDataSqlType,ButtonEnum)
+from ._exportToExcel import ExportToExcel
 from ._search import SearchTableModel
+
 
 
     # # 使用本类，最好在数据库中做如下设定
@@ -83,7 +84,7 @@ def _createFilter(fieldName, value) -> str:
     else:
         return ''
 
-class _JPRelationalDelegate(QtSql.QSqlRelationalDelegate):
+class _RelationalDelegate(QtSql.QSqlRelationalDelegate):
     def __init__(self, parent: QtWidgets.QWidget,
                  mapper: QtWidgets.QDataWidgetMapper):
         '''自定义有外键的单表编辑代理\n
@@ -132,13 +133,13 @@ class _JPRelationalDelegate(QtSql.QSqlRelationalDelegate):
             mapperModel.setData(mapperIndex, data)
         elif isinstance(editor, QtWidgets.QLineEdit):
             fieldtype = editor.viewColumn.jpFieldType
-            if fieldtype == JPFieldType.Int:
+            if fieldtype == FieldType.Int:
                 data = None
                 txt = editor.text()
                 if txt:
                     data = int(txt.replace(",", ''))
                 mapperModel.setData(mapperIndex, data)
-            elif fieldtype == JPFieldType.Float:
+            elif fieldtype == FieldType.Float:
                 data = None
                 txt = editor.text()
                 if txt:
@@ -151,13 +152,13 @@ class _JPRelationalDelegate(QtSql.QSqlRelationalDelegate):
         #mapperModel.dataChanged.emit(mapperIndex, mapperIndex)
 
 
-class _JPComboBoxModel(QtCore.QAbstractTableModel):
+class _ComboBoxModel(QtCore.QAbstractTableModel):
     def __init__(self, parent, viewColumn: ViewColumn):
         '''返回一个用于主表编辑关系数据QComboBox对象的数据模型。\n
         注意由于model从数据库中读取数据时会将Null自动转换成0值，
         所以此功能要求modelColumn列的有效值中不包含0，如果有0值，
         会自动将combobox设置成未选中任何行的状态'''
-        # 具体实现请参见_JPRelationalDelegate类setEditorData()方法
+        # 具体实现请参见_RelationalDelegate类setEditorData()方法
         self.viewColumn = viewColumn
         super().__init__(parent=parent)
 
@@ -183,7 +184,7 @@ class _JPComboBoxModel(QtCore.QAbstractTableModel):
 
 
 
-class JPMainTableModel(QtSql.QSqlRelationalTableModel):
+class MainTableModel(QtSql.QSqlRelationalTableModel):
     # _tp中存放需要添加到数据映射器中的控件类型
     # 要添加的控件，必须用字段名命名(大小写敏感)
     _tp = (QtWidgets.QLineEdit, QtWidgets.QDateEdit, QtWidgets.QTextEdit,
@@ -194,10 +195,10 @@ class JPMainTableModel(QtSql.QSqlRelationalTableModel):
     # 记录添加或修改信号
     recordInserted = QtCore.pyqtSignal(str, str)
     recordChanged = QtCore.pyqtSignal(str, str)
-    statisticsValueChange = QtCore.pyqtSignal(str, JPStatisticsMode,
+    statisticsValueChange = QtCore.pyqtSignal(str, StatisticsMode,
                                               QtCore.QVariant)
     editFormButtonClicked = QtCore.pyqtSignal(str)
-    mainRecordSaved = QtCore.pyqtSignal(JPEditDataMode, QtCore.QVariant)
+    mainRecordSaved = QtCore.pyqtSignal(EditDataMode, QtCore.QVariant)
 
     def __init__(self,
                  editUi: object,
@@ -246,7 +247,7 @@ class JPMainTableModel(QtSql.QSqlRelationalTableModel):
         self.mapper = QtWidgets.QDataWidgetMapper(self.Dialog)
         # 此行主要是解决下拉列表框的问题
         self.mapper.setItemDelegate(
-            _JPRelationalDelegate(self.Dialog, self.mapper))
+            _RelationalDelegate(self.Dialog, self.mapper))
         # 提交策略
         # QDataWidgetMapper.AutoSubmit只是自动提交到model并不向数据库提交
         # QDataWidgetMapper.ManualSubmit则是在手动执行submit()时同时向模型再向数据库提交
@@ -265,7 +266,7 @@ class JPMainTableModel(QtSql.QSqlRelationalTableModel):
                 self.mapper.addMapping(widget, i)
                 if isinstance(widget, QtWidgets.QComboBox):
                     vc = self._widgetsInformation[widget.objectName()]
-                    model = _JPComboBoxModel(self.Dialog, vc)
+                    model = _ComboBoxModel(self.Dialog, vc)
                     widget.setModel(model)
                     self._hasComboBox = True
                 else:
@@ -273,27 +274,27 @@ class JPMainTableModel(QtSql.QSqlRelationalTableModel):
                         widget.objectName()]
         self._widgetsInformation.setModel(self)
 
-    def getDefaultButtonObjectName(self, buttonEnum: JPButtonEnum) -> str:
+    def getDefaultButtonObjectName(self, buttonEnum: ButtonEnum) -> str:
         '''设置窗体中按钮的名称'''
         return ''
 
     def getReportEvent(self):
         '''返回用户定义的一个报表类'''
-        return JPReport
+        return Report
 
     def _addbuttonCilcked(self):
         # 添加按钮信号
         def clickEmit(name: str):
             self.editFormButtonClicked.emit(name)
 
-        def addOneButtom(buttonEnum: JPButtonEnum, dic: dict):
+        def addOneButtom(buttonEnum: ButtonEnum, dic: dict):
             name = self.getDefaultButtonObjectName(buttonEnum)
             if name:
                 obj = self.Dialog.findChild(QtWidgets.QPushButton, name)
                 if obj:
                     dic[buttonEnum] = obj
 
-        E = JPButtonEnum
+        E = ButtonEnum
         butDic = {}
         for e in [E.Save, E.Cancel, E.Delete, E.PDF, E.Print]:
             addOneButtom(e, butDic)
@@ -312,7 +313,7 @@ class JPMainTableModel(QtSql.QSqlRelationalTableModel):
         # 所有内置按钮名字的集合
         objNames = [v.objectName() for v in butDic.values()]
         for but in buts:
-            if self._editDataMode == JPEditDataMode.readOnlyMode:
+            if self._editDataMode == EditDataMode.readOnlyMode:
                 # 只读状态禁止按钮，打印按钮始终显示
                 if but.objectName()!=butDic[E.Print].objectName():
                     but.setDisabled(True)
@@ -323,11 +324,11 @@ class JPMainTableModel(QtSql.QSqlRelationalTableModel):
 
 
     def getFieldsInfomationEvent(self, weidgetInfos: ViewColumns,
-                                 EditFormModelRole: JPEditFormModelRole):
+                                 EditFormModelRole: EditFormModelRole):
         if self._hasComboBox:
             raise RuntimeError('窗体中存在ComboBox部件，必须重写before方法')
 
-    def init(self, editmode: JPEditDataMode, filterValue: str = ""):
+    def init(self, editmode: EditDataMode, filterValue: str = ""):
         # 下面各行顺序不能修改，否则映射可能无效
         self._filterValue = filterValue
         tn = self._mainTableName
@@ -353,7 +354,7 @@ class JPMainTableModel(QtSql.QSqlRelationalTableModel):
         self._widgetsInformation._setDefaultColumn(self, self._db,
                                                    self.record())
         self.getFieldsInfomationEvent(self._widgetsInformation,
-                                      JPEditFormModelRole.mainModel)
+                                      EditFormModelRole.mainModel)
         self.setFilter(filter)
         self.select()
         self._createMapper()
@@ -361,7 +362,7 @@ class JPMainTableModel(QtSql.QSqlRelationalTableModel):
         self._addMapper()
         self._editDataMode = editmode
         self._addbuttonCilcked()
-        if self._editDataMode == JPEditDataMode.newMode:
+        if self._editDataMode == EditDataMode.newMode:
             self.insertRow(0)
         self._setWidgetsState()
         self.mapper.toFirst()
@@ -388,7 +389,7 @@ class JPMainTableModel(QtSql.QSqlRelationalTableModel):
         return
 
     def setWidgetState(self, widgetName: str, widget: QtWidgets.QWidget,
-                       editMode: JPEditDataMode):
+                       editMode: EditDataMode):
         '''用户可重写此方法设置每一个控件的状态'''
         return
 
@@ -414,7 +415,7 @@ class JPMainTableModel(QtSql.QSqlRelationalTableModel):
         # 设置主键字段控件的状态
         for obj in Widgets:
             nm = obj.objectName()
-            if self._editDataMode == JPEditDataMode.readOnlyMode:
+            if self._editDataMode == EditDataMode.readOnlyMode:
                 obj.setEnabled(False)
             if nm == self._mainPkFieldName or nm == self._mainLinkField:
                 obj.setEnabled(False)
@@ -446,10 +447,10 @@ class JPMainTableModel(QtSql.QSqlRelationalTableModel):
             self._LAST_ID = None
             fn = self._mainLinkField if self._mainLinkField else self._mainPkFieldName
             fn_i = self.fieldIndex(fn)
-            if self._editDataMode == JPEditDataMode.editMode:
+            if self._editDataMode == EditDataMode.editMode:
                 index = self.createIndex(0, fn_i)
                 self._LAST_ID = self.data(index, Qt.EditRole)
-            if self._editDataMode == JPEditDataMode.newMode:
+            if self._editDataMode == EditDataMode.newMode:
                 sql = 'select {linkField} from {tableName} where {pkField}=LAST_INSERT_ID()'
                 sql = sql.format(linkField=fn,
                                  tableName=self.tableName(),
@@ -479,7 +480,7 @@ class JPMainTableModel(QtSql.QSqlRelationalTableModel):
     def saveData(self):
         if self._checkRequiredValue() is False:
             return
-        if self._editDataMode == JPEditDataMode.readOnlyMode:
+        if self._editDataMode == EditDataMode.readOnlyMode:
             return
         rollback = False
         errStr = ''
@@ -521,14 +522,14 @@ class JPMainTableModel(QtSql.QSqlRelationalTableModel):
                 if self.autoCloseDialog:
                     self.Dialog.done(1)
                 m = self._editDataMode
-                if m == JPEditDataMode.editMode:
+                if m == EditDataMode.editMode:
                     self.mainRecordSaved.emit(m, self._filterValue)
-                elif m == JPEditDataMode.newMode:
+                elif m == EditDataMode.newMode:
                     self.mainRecordSaved.emit(m, self._LAST_ID)
                 return True
 
 
-class JPSubTableModel(QtCore.QAbstractTableModel):
+class SubTableModel(QtCore.QAbstractTableModel):
     # 统计信息信号，只有添加了统计列才会发送此信号
     # 信号的三个参数分别为：统计字段名、统计类型、统计值
     #statisticsValueChange = QtCore.pyqtSignal(str, int, float)
@@ -554,7 +555,7 @@ class JPSubTableModel(QtCore.QAbstractTableModel):
 
         # 存放tableView中要显示的列的信息
         self._viewColumns = ViewColumns(db)
-        self.mainModel: JPMainTableModel = None
+        self.mainModel: MainTableModel = None
         # 存放用户增加的统计列的信息
         self._linkFieldName = linkFieldName
         self._model = QtSql.QSqlTableModel(parent=dialog, db=db)
@@ -571,7 +572,7 @@ class JPSubTableModel(QtCore.QAbstractTableModel):
         self._ico_act_new = _loadIcon(_ICO_DICT['ico_act_new'])
 
     def init(self,
-             editmode: JPEditDataMode = JPEditDataMode.readOnlyMode,
+             editmode: EditDataMode = EditDataMode.readOnlyMode,
              filterValue: str = '',
              sorter: str = ''):
 
@@ -615,7 +616,7 @@ class JPSubTableModel(QtCore.QAbstractTableModel):
         r = len(self._viewColumns)
         if self.buttonEnabled is False:
             return r
-        if self._editDataMode == JPEditDataMode.readOnlyMode:
+        if self._editDataMode == EditDataMode.readOnlyMode:
             return r
         else:
             return r + 1
@@ -628,7 +629,7 @@ class JPSubTableModel(QtCore.QAbstractTableModel):
         col = index.column()
         # 重新生成一个index
         viewIndex = self._model.createIndex(row, col)
-        if self._editDataMode == JPEditDataMode.readOnlyMode:
+        if self._editDataMode == EditDataMode.readOnlyMode:
             return Qt.ItemIsSelectable | Qt.ItemIsEnabled
 
         if self._viewColumns[index.column()].fieldIndex == -1:
@@ -703,18 +704,18 @@ class JPSubTableModel(QtCore.QAbstractTableModel):
     @property
     def editDataMode(self):
         '''设置模型的数据状态，可选:\n
-        JPEditDataMode.readOnlyMode\n
-        JPEditDataMode.editMode\n
-        JPEditDataMode.newMode\n
+        EditDataMode.readOnlyMode\n
+        EditDataMode.editMode\n
+        EditDataMode.newMode\n
         '''
         return self._editDataMode
 
     @editDataMode.setter
-    def editDataMode(self, mode: JPEditDataMode):
+    def editDataMode(self, mode: EditDataMode):
         self._editDataMode = mode
         tv = self._tableView
         #  只读状态时，设置view的选择状态
-        if self._editDataMode == JPEditDataMode.readOnlyMode:
+        if self._editDataMode == EditDataMode.readOnlyMode:
             en = QtWidgets.QAbstractItemView
             tv.setEditTriggers(en.NoEditTriggers)
             tv.setSelectionBehavior(en.SelectRows)
@@ -727,7 +728,7 @@ class JPSubTableModel(QtCore.QAbstractTableModel):
                 self._setTableViewMenu)  # 右键菜单
 
     def _setTableViewMenu(self, pos):
-        # if self.editDataMode == JPEditDataMode.readOnlyMode:
+        # if self.editDataMode == EditDataMode.readOnlyMode:
         #     return
         # 弹出的位置要减去标题行的高度
         tv = self._tableView
@@ -783,7 +784,7 @@ class JPSubTableModel(QtCore.QAbstractTableModel):
         '''返回每一列的代理，可重写'''
         obj = self._viewColumns[columnIndex]
         tv = self._tableView
-        JT = JPFieldType
+        JT = FieldType
         if obj.fieldIndex == -1:
             # 调用时判断返回值，如果是计算列，歹能返回任何值
             return 
@@ -791,7 +792,7 @@ class JPSubTableModel(QtCore.QAbstractTableModel):
             return IntSearchDelegate(tv, 0)
         if obj.rowSource:
             return IntSelectDelegate(tv)
-        jpFieldType = getJPFieldType(self.db, field.typeID())
+        jpFieldType = getFieldType(self.db, field.typeID())
         if jpFieldType == JT.Int:
             return IntgerDelegate(tv, obj.prefix, obj.suffix)
         elif jpFieldType == JT.Float:
@@ -933,13 +934,13 @@ class JPSubTableModel(QtCore.QAbstractTableModel):
     def _beforeInsertToBaseSubTable(self, record: QtSql.QSqlRecord):
         '''增加一行之前给子表的主表键值列赋值'''
         # 此方法会在底层给数据库中表增加行之前被自动调用
-        if self.editDataMode == JPEditDataMode.editMode:
+        if self.editDataMode == EditDataMode.editMode:
             kn, kv = self._model.filter().split("=")
             kv = kv.replace("'", '')
             # 判断主表主键的类型,并给新增加的行赋值
-            tp = getJPFieldType(self.db, record.field(kn).typeID())
+            tp = getFieldType(self.db, record.field(kn).typeID())
             newKV = None
-            if tp == JPFieldType.Int:
+            if tp == FieldType.Int:
                 kv = int(kv)
             record.setValue(kn, kv)
             record.setGenerated(kn, True)
@@ -969,7 +970,7 @@ class JPSubTableModel(QtCore.QAbstractTableModel):
         return True
 
 
-class JPMainSubTableModel(JPMainTableModel):
+class MainSubTableModel(MainTableModel):
     def __init__(self,
                  editUi: object,
                  tableViewName: str = 'tableView',
@@ -981,7 +982,7 @@ class JPMainSubTableModel(JPMainTableModel):
         self._subLinkField: str = ''
         self._subSorter: str = ''
         self._db = db
-        self._subModel: JPSubTableModel = None
+        self._subModel: SubTableModel = None
         self._tableView = self._findTableView(tableViewName)
 
     def _findTableView(self, tableViewName) -> QtWidgets.QTableView:
@@ -1000,30 +1001,30 @@ class JPMainSubTableModel(JPMainTableModel):
         self._subSorter = sorter
 
     @property
-    def subModel(self) -> JPSubTableModel:
+    def subModel(self) -> SubTableModel:
         if self._subModel:
             return self._subModel
         raise RuntimeError("subModel()方法获取子表模型前必须先执行init()方法")
 
     def onGetSubModel(self):
         '''重写该方法指定一个重写的用于编辑窗体的子表模型，
-        返回值必须是JPSubTableModel类的子类\n
+        返回值必须是SubTableModel类的子类\n
         子类中可以重写相关的方法以改变类的功能,重写部分。   
         '''
-        return JPSubTableModel
+        return SubTableModel
 
     def getFieldsInfomationEvent(self, columnsInfInSubFormat: ViewColumns,
-                                 EditFormModelRole: JPEditFormModelRole):
+                                 EditFormModelRole: EditFormModelRole):
         '''必须重写此函数，添加列信息等'''
         raise RuntimeError('必须重写此函数，添加列信息等!')
 
     def init(self,
-             editmode: JPEditDataMode = JPEditDataMode.newMode,
+             editmode: EditDataMode = EditDataMode.newMode,
              filterValue: str = ""):
         # 初始化主表模型
         super().init(editmode, filterValue)
 
-        self._editDataMode: JPEditDataMode = editmode
+        self._editDataMode: EditDataMode = editmode
         self._filterValue = filterValue
         self._subModel = self.onGetSubModel()(self.Dialog,
                                               self._subTableName,
@@ -1042,11 +1043,11 @@ class JPMainSubTableModel(JPMainTableModel):
         self._subModel._viewColumns = ViewColumns(self._db)
 
         self.getFieldsInfomationEvent(self._subModel._viewColumns,
-                                      JPEditFormModelRole.subModel)
+                                      EditFormModelRole.subModel)
         self._subModel.init(self._editDataMode, self._filterValue,
                             self._subSorter)
 
-        if self._editDataMode == JPEditDataMode.newMode:
+        if self._editDataMode == EditDataMode.newMode:
             self._subModel.appendRow()
         self._tableView.setModel(self._subModel)
         for i, vc in enumerate(self._subModel._viewColumns):
@@ -1081,7 +1082,7 @@ class JPMainSubTableModel(JPMainTableModel):
             P.beginPrint()
 
     def checkDataBeforeInsertRowToSubTable(self, lastRecord: QtSql.QSqlRecord):
-        if self._editDataMode == JPEditDataMode.readOnlyMode:
+        if self._editDataMode == EditDataMode.readOnlyMode:
             return False
         '''子表增加新行前检查最后一行数据的有效性'''
         s = ('没有重写增加新行前的检查函数,lastRecord参数为最后一行的数据用于判断本函数,返回值为True时增加行')
@@ -1104,7 +1105,7 @@ class JPMainSubTableModel(JPMainTableModel):
         self._subModel.init(self.editDataMode, v)
 
     def saveData(self):
-        if self._editDataMode == JPEditDataMode.readOnlyMode:
+        if self._editDataMode == EditDataMode.readOnlyMode:
             return
         if self._checkRequiredValue() is False:
             return
@@ -1159,14 +1160,14 @@ class JPMainSubTableModel(JPMainTableModel):
                 if self.autoCloseDialog:
                     self.Dialog.done(1)
                 m = self._editDataMode
-                if m == JPEditDataMode.editMode:
+                if m == EditDataMode.editMode:
                     self.mainRecordSaved.emit(m, self._filterValue)
-                elif m == JPEditDataMode.newMode:
+                elif m == EditDataMode.newMode:
                     self.mainRecordSaved.emit(m, self._LAST_ID)
                 return True
 
 
-class JPListModel(QtSql.QSqlQueryModel):
+class ListModel(QtSql.QSqlQueryModel):
     def __init__(self,
                  tableView: QtWidgets.QTableView,
                  sql: str,
@@ -1286,7 +1287,7 @@ class JPListModel(QtSql.QSqlQueryModel):
             self._tableView.setColumnWidth(i, vc.width)
 
     def _initEditModel(self,
-                       editmode: JPEditDataMode = JPEditDataMode.newMode,
+                       editmode: EditDataMode = EditDataMode.newMode,
                        filterValue=None):
 
         if not self._mainTableName:
@@ -1294,7 +1295,7 @@ class JPListModel(QtSql.QSqlQueryModel):
             raise RuntimeError(t)
 
         if not self.editUI:
-            raise RuntimeError('必须在实例化JPListModel类时设置编辑窗体ui')
+            raise RuntimeError('必须在实例化ListModel类时设置编辑窗体ui')
 
         # 生成编辑模型类(mainSub)
         _class = self.onGetMainModelOrMainSubModel()
@@ -1322,7 +1323,7 @@ class JPListModel(QtSql.QSqlQueryModel):
 
         self._modelObject.mainRecordSaved.connect(self._gotoRow)
 
-    def _gotoRow(self, editmode: JPEditDataMode, pkValue: QtCore.QVariant):
+    def _gotoRow(self, editmode: EditDataMode, pkValue: QtCore.QVariant):
         if not pkValue:
             return
         self._setQuery(self._defaultFilter)
@@ -1371,7 +1372,7 @@ class JPListModel(QtSql.QSqlQueryModel):
             newIndex = self.createIndex(index.row(), col)
             return self.data(newIndex, Qt.EditRole)
 
-    def onEditFormModelcreated(self, model, mode: JPEditFormModelRole):
+    def onEditFormModelcreated(self, model, mode: EditFormModelRole):
         '''编辑窗体模型建立完成后调用此事件函数，可在此函数中增加子表列等'''
         return
 
@@ -1383,12 +1384,12 @@ class JPListModel(QtSql.QSqlQueryModel):
         pk = self._getCurrentSelectPKValue()
         if pk is None:
             return
-        self._initEditModel(JPEditDataMode.editMode, pk)
+        self._initEditModel(EditDataMode.editMode, pk)
         self.onBefoerShowEditForm(pk)
         self._modelObject.Dialog.exec_()
 
     def actionNew(self):
-        self._initEditModel(JPEditDataMode.newMode)
+        self._initEditModel(EditDataMode.newMode)
         self.onBefoerShowEditForm(None)
         self._modelObject.Dialog.exec_()
 
@@ -1458,7 +1459,7 @@ class JPListModel(QtSql.QSqlQueryModel):
         pk = self._getCurrentSelectPKValue()
         if pk is None:
             return
-        self._initEditModel(JPEditDataMode.readOnlyMode, pk)
+        self._initEditModel(EditDataMode.readOnlyMode, pk)
         self.onBefoerShowEditForm(pk)
         self._modelObject.Dialog.exec_()
 
@@ -1471,7 +1472,7 @@ class JPListModel(QtSql.QSqlQueryModel):
 
 
     def actionExortToExcel(self):
-        xls = JPExportToExcel(self._tableView.parent())
+        xls = ExportToExcel(self._tableView.parent())
         xls.exportQuery(self._viewColumns, self.query())
 
     def onGetMainModelOrMainSubModel(self):
@@ -1479,5 +1480,5 @@ class JPListModel(QtSql.QSqlQueryModel):
         用户根据MainModel或MainSubModel设计一个子类返回，
         可改变子类的行为'''
         if self._subTableName:
-            return JPMainSubTableModel
-        return JPMainTableModel
+            return MainSubTableModel
+        return MainTableModel

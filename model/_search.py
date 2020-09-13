@@ -1,21 +1,23 @@
-from click.types import DateTime
-from lib.JPMvc.JPNewModel._viewColumn import ViewColumns
 import logging
 import typing
-from enum import Enum
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import Qt, QModelIndex
-from JPDatabase.FieldType import JPFieldType, getJPFieldType
-from PyQt5 import QtSql
-from lib.JPMvc.JPNewModel._delegate import (DateDelegate, FloatDelegate, IntgerDelegate,
-                        IntSearchDelegate, IntSelectDelegate, StringDelegate,ReadOnlyDelegate)
 from functools import partial
-from lib.JPMvc.JPNewModel._icos import _ICO_DICT,_loadIcon
 
+from click.types import DateTime
+from PyQt5 import QtCore, QtSql, QtWidgets
+from PyQt5.QtCore import QModelIndex, Qt
+
+from jplib.database.FieldType import FieldType
+from jplib.model import ViewColumns
+from jplib.model._delegate import (DateDelegate, FloatDelegate, IntgerDelegate,
+                             IntSelectDelegate,
+                             ReadOnlyDelegate, StringDelegate)
+from jplib.model._icos import _ICO_DICT, _loadIcon
+#from model._viewColumn import ViewColumns
 
 TITLE = '删除按钮,关系,(,字段名,运算,起始值,结束值,)'.split(',')
 COLUMN_BUTTON = 0
 COLUMN_OPERATOR = 1
+
 COLUMN_BRACKETLEFT = 2
 COLUMN_FIELD = 3
 COLUMN_EXP = 4
@@ -63,7 +65,7 @@ class Ui_DlgSearch(object):
 
 
 ExpressionData = {
-    JPFieldType.String:
+    FieldType.String:
     [("`{fn}` like '%{v1}%'", 1, 0, "包含", "Include"),
      ("`{fn}`='{v1}'", 1, 0, "等于", "Equal"),
      ("`{fn}`>'{v1}'", 1, 0, "大于", "GreaterThan"),
@@ -83,11 +85,11 @@ ExpressionData = {
      ("LENGTH(`{fn}`)>{v1}", 1, 0, "长度大于", "LengthGreaterThan"),
      ("LENGTH(`{fn}`)<{v1}", 1, 0, "长度小于", "LengthLessThan"),
      ("`{fn}`=''", 0, 0, "为空字符", "IsEmptyString")],
-    JPFieldType.Boolean: [("`{fn}`=1", 0, 0, "值为是", "IsTrue"),
+    FieldType.Boolean: [("`{fn}`=1", 0, 0, "值为是", "IsTrue"),
                           ("`{fn}`=0", 0, 0, "值为否", "ISFalse"),
                           ("IsNull(`{fn}`)", 0, 0, "为空", "IsNull"),
                           ("Not IsNull(`{fn}`)", 0, 0, "不为空", "NotNull")],
-    JPFieldType.Date:
+    FieldType.Date:
     [("`{fn}`='{v1}'", 1, 0, "等于", "Equal"),
      ("`{fn}`<'{v1}'", 1, 0, "早于", "EarluThan"),
      ("`{fn}`<='{v1}'", 1, 0, "早于等于", "EarlyOrEqual"),
@@ -98,7 +100,7 @@ ExpressionData = {
      ("Not (`{fn}` Between '{v1}' AND '{v1}')", 1, 1, "不在区间内", "NotBetween"),
      ("IsNull(`{fn}`)", 0, 0, "为空", "IsNull"),
      ("Not IsNull(`{fn}`)", 0, 0, "不为空", "NotNull")],
-    JPFieldType.Int:
+    FieldType.Int:
     [("`{fn}`={v1}", 1, 0, "等于", "Equal"),
      ("`{fn}`>{v1}", 1, 0, "大于", "GreaterThan"),
      ("`{fn}`>={v1}", 1, 0, "大于或等于", "GreaterOrEqual"),
@@ -110,7 +112,7 @@ ExpressionData = {
      ("IsNull(`{fn}`)", 0, 0, "为空", "IsNull"),
      ("Not IsNull(`{fn}`)", 0, 0, "不为空", "NotNull")]
 }
-ExpressionData[JPFieldType.Float] = ExpressionData[JPFieldType.Int]
+ExpressionData[FieldType.Float] = ExpressionData[FieldType.Int]
 
 
 class _ExpressionTemplate():
@@ -122,7 +124,7 @@ class _ExpressionTemplate():
 
 
 class _Expressions():
-    def __init__(self, tp: JPFieldType) -> None:
+    def __init__(self, tp: FieldType) -> None:
         '''某个类型字段的可选择表达式'''
         super().__init__()
         self._list = []
@@ -218,9 +220,9 @@ class _Condiction():
         if not value:
             return None
         tp = self._viewColumn.jpFieldType
-        if tp in (JPFieldType.String, JPFieldType.Float, JPFieldType.Int):
+        if tp in (FieldType.String, FieldType.Float, FieldType.Int):
             return self._viewColumn.formatString.format(value)
-        elif tp in (JPFieldType.Date, JPFieldType.DateTime):
+        elif tp in (FieldType.Date, FieldType.DateTime):
             return value.toString('yyyy-MM-dd')
         else:
             raise Exception('不应该执行到此')
@@ -230,9 +232,9 @@ class _Condiction():
         if not value:
             return None
         tp = self._viewColumn.jpFieldType
-        if tp in (JPFieldType.String, JPFieldType.Float, JPFieldType.Int):
+        if tp in (FieldType.String, FieldType.Float, FieldType.Int):
             return str(value)
-        elif tp in (JPFieldType.Date, JPFieldType.DateTime):
+        elif tp in (FieldType.Date, FieldType.DateTime):
             return value.toString('yyyy-MM-dd')
         else:
             raise Exception('不应该执行到此')
@@ -303,15 +305,15 @@ class _Condiction():
         if col not in (COLUMN_VALUE1, COLUMN_VALUE2):
             raise Exception('参数有误')
         tp = self._viewColumn.jpFieldType
-        if tp == JPFieldType.String:
+        if tp == FieldType.String:
             result = StringDelegate(par)
-        elif tp == JPFieldType.Int:
+        elif tp == FieldType.Int:
             result = IntgerDelegate(par)
-        elif tp == JPFieldType.Float:
+        elif tp == FieldType.Float:
             result = FloatDelegate(par)
-        elif tp == JPFieldType.Boolean:
+        elif tp == FieldType.Boolean:
             result = IntSelectDelegate(par)
-        elif tp in (JPFieldType.Date, JPFieldType.DateTime):
+        elif tp in (FieldType.Date, FieldType.DateTime):
             de = DateDelegate(par)
             de.defaultDate = QtCore.QDate.currentDate()
             result = de
@@ -330,12 +332,12 @@ class _Condiction():
             return Qt.AlignLeft | Qt.AlignVCenter
         elif column in (COLUMN_VALUE1, COLUMN_VALUE2):
             vc = self._viewColumn
-            if vc.jpFieldType == JPFieldType.String:
+            if vc.jpFieldType == FieldType.String:
                 return Qt.AlignLeft | Qt.AlignVCenter
-            elif vc.jpFieldType in (JPFieldType.Int, JPFieldType.Float):
+            elif vc.jpFieldType in (FieldType.Int, FieldType.Float):
                 return Qt.AlignLeft | Qt.AlignVCenter
-            elif vc.jpFieldType in (JPFieldType.Date, JPFieldType.DateTime,
-                                    JPFieldType.Boolean, JPFieldType.Unknown):
+            elif vc.jpFieldType in (FieldType.Date, FieldType.DateTime,
+                                    FieldType.Boolean, FieldType.Unknown):
                 return Qt.AlignCenter
         else:
             return Qt.AlignCenter
@@ -379,7 +381,6 @@ class _Condictions():
         return iter(self.list)
 
 
-from lib.JPMvc.JPNewModel import ViewColumns
 
 
 class _commonComboBox(QtWidgets.QStyledItemDelegate):
@@ -494,7 +495,7 @@ class _expComboBox(QtWidgets.QStyledItemDelegate):
 
         wdgt = QtWidgets.QComboBox(parent)
 
-        tp = self.parent.getJPFieldType(index.row())
+        tp = self.parent.getFieldType(index.row())
         self.expressionData = _Expressions(tp)
         for e in self.expressionData.item():
             wdgt.addItem(e.titleChinese, e)
@@ -652,7 +653,7 @@ class SearchTableModel(QtCore.QAbstractTableModel):
             self.dataChanged.emit(index, index, [Qt.DisplayRole])
         self.refreshValueDelegate(cur_index.row())
 
-    def getJPFieldType(self, row: int) -> JPFieldType:
+    def getFieldType(self, row: int) -> FieldType:
         return self.Condictions[row].jpFieldType
 
     def __findTableView(self, parent) -> QtWidgets.QTableView:
@@ -786,7 +787,7 @@ class SearchTableModel(QtCore.QAbstractTableModel):
 #     db.open()
 #     header = ['单据编号', '单价', '客户名称', '金额', '日期']
 #     sql = 'select fOrderID,fPrice,c.fCustomerName,o.fAmount,fRequiredDeliveryDate,fSubmited from t_order as o left join t_customer as c on o.fCustomerID=c.fCustomerID'
-#     mod = JPListModel(QtWidgets.QTableView(),
+#     mod = ListModel(QtWidgets.QTableView(),
 #                       sql,
 #                       pkFieldName='fOrderID',
 #                       db=db,

@@ -2,13 +2,13 @@
 from enum import Enum
 from dataclasses import dataclass
 
-class JPEditDataMode(Enum):
+class EditDataMode(Enum):
     '''指定编辑数据模式：只读、编辑、新增'''
     readOnlyMode = 0
     editMode = 1
     newMode = 2
 
-class JPButtonEnum(Enum):
+class ButtonEnum(Enum):
     '''窗体中按钮的类型'''
     Save = 0
     Cancel = 1
@@ -19,13 +19,13 @@ class JPButtonEnum(Enum):
     ExportExcel = 6
 
 
-class JPEditFormModelRole(Enum):
+class EditFormModelRole(Enum):
     '''指定编辑模型的类型：单个表或母子表'''
     mainModel = 0
     mainSubModel = 1
     subModel = 2
 
-class JPStatisticsMode(Enum):
+class StatisticsMode(Enum):
     '''统计数据的类型'''
     Sum = 1
     Max = 2
@@ -41,6 +41,6 @@ class SaveDataSqlType(Enum):
 
 @dataclass
 class _statisticsColumn:
-    statisticsMode: JPStatisticsMode = JPStatisticsMode.Sum
+    statisticsMode: StatisticsMode = StatisticsMode.Sum
     precision: int = 0
     func = lambda x: sum(x)

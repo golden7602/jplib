@@ -1,8 +1,8 @@
 
 from PyQt5 import QtCore,QtSql
 from PyQt5.QtCore import Qt
-from JPDatabase.FieldType import JPFieldType,getJPFieldType
-from JPMvc.JPNewModel.constants import JPStatisticsMode,_statisticsColumn
+from jplib.database.FieldType import FieldType,getFieldType
+from jplib.model.constants import StatisticsMode,_statisticsColumn
 
 
 class ViewColumn(object):
@@ -28,7 +28,7 @@ class ViewColumn(object):
         self.fieldName = fieldName
         self.align = align
         self.formatString = formatString
-        self.jpFieldType: JPFieldType = JPFieldType.Unknown
+        self.jpFieldType: FieldType = FieldType.Unknown
         self._valueRange = valueRange
         self._rowSource = []
         self.rootID = None
@@ -43,19 +43,19 @@ class ViewColumn(object):
         self._statisticses = []
 
     def addStatistics(self,
-                      statisticsMode: JPStatisticsMode,
+                      statisticsMode: StatisticsMode,
                       precision: int = 0):
         '''添加一个统计，只能统计子表中的可见列'''
         obj = _statisticsColumn(statisticsMode, precision)
         self._statisticses.append(obj)
         mod = statisticsMode
-        if mod == JPStatisticsMode.Sum:
+        if mod == StatisticsMode.Sum:
             obj.func = lambda lst: sum(lst) if lst else None
-        if mod == JPStatisticsMode.Average:
+        if mod == StatisticsMode.Average:
             obj.func = lambda lst: sum(lst) / len(lst) if lst else None
-        if mod == JPStatisticsMode.Min:
+        if mod == StatisticsMode.Min:
             obj.func = lambda lst: min(lst) if lst else None
-        if mod == JPStatisticsMode.Max:
+        if mod == StatisticsMode.Max:
             obj.func = lambda lst: max(lst) if lst else None
 
     def setRange(self, minValue, maxValue):
@@ -117,7 +117,7 @@ class ViewColumn(object):
 
     def displayString(self, value):
         f = self.formatString
-        if self.jpFieldType == JPFieldType.Date:
+        if self.jpFieldType == FieldType.Date:
             return value.toString(f) if value else None
         if self.rowSource:
             r = [
@@ -152,17 +152,17 @@ class ViewColumns(object):
             vc.align = Qt.AlignVCenter | Qt.AlignRight
         else:
             field = rec.field(vc.fieldName)
-            vc.jpFieldType = getJPFieldType(self.db, field.typeID())
-            if vc.jpFieldType == JPFieldType.Int:
+            vc.jpFieldType = getFieldType(self.db, field.typeID())
+            if vc.jpFieldType == FieldType.Int:
                 vc.formatString = '{:,.0f}'
                 vc.align = Qt.AlignVCenter | Qt.AlignRight
-            elif vc.jpFieldType == JPFieldType.Float:
+            elif vc.jpFieldType == FieldType.Float:
                 vc.formatString = '{:,.' + str(field.precision()) + 'f}'
                 vc.align = Qt.AlignVCenter | Qt.AlignRight
-            elif vc.jpFieldType == JPFieldType.Date:
+            elif vc.jpFieldType == FieldType.Date:
                 vc.formatString = 'yyyy-MM-dd'
                 vc.align = Qt.AlignCenter
-            elif vc.jpFieldType == JPFieldType.String:
+            elif vc.jpFieldType == FieldType.String:
                 vc.formatString = '{}'
                 vc.align = Qt.AlignVCenter | Qt.AlignLeft
 
@@ -227,7 +227,7 @@ class ViewColumns(object):
             at = vc.fieldIndex
             if at != -1:
                 field = record.field(at)
-                vc.jpFieldType = getJPFieldType(self.db, field.typeID())
+                vc.jpFieldType = getFieldType(self.db, field.typeID())
             if vc.formatString is None:
                 self._setViewColumnAlighAndFormatString(vc)
 
